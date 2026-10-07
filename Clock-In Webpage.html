@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mama's Pot - Clock In/Out</title>
+<style>
+  body {
+    font-family: -apple-system, Arial, sans-serif;
+    background: #1e293b;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .card {
+    background: #fff;
+    color: #111;
+    border-radius: 16px;
+    padding: 32px 24px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p.sub { color: #666; font-size: 14px; margin: 0 0 24px; }
+  button {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    background: #16a34a;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:disabled { background: #9ca3af; }
+  #result {
+    margin-top: 20px;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    display: none;
+  }
+  #result.ok { background: #dcfce7; color: #166534; display: block; }
+  #result.err { background: #fee2e2; color: #991b1b; display: block; }
+  #status { font-size: 13px; color: #888; margin-top: 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Clock In / Out</h1>
+    <p class="sub">Tap the button below. We'll use your phone's current location to verify you're on site.</p>
+    <button id="clockBtn">Clock In / Out</button>
+    <div id="status"></div>
+    <div id="result"></div>
+  </div>
+
+<script>
+  const btn = document.getElementById('clockBtn');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+
+  // Reads ?t=TOKEN from the URL
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('t');
+
+  const WEBHOOK_URL = 'https://automatenaija.prodeegee.com/webhook/web-clockin';
+
+  btn.addEventListener('click', () => {
+    resultEl.style.display = 'none';
+    if (!token) {
+      resultEl.className = 'err';
+      resultEl.textContent = 'Missing link token. Please use your personal clock-in link.';
+      resultEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    statusEl.textContent = 'Getting your location...';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        statusEl.textContent = 'Sending...';
+        try {
+          const res = await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: token,
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+              timestamp: new Date().toISOString()
+            })
+          });
+          const data = await res.json();
+          statusEl.textContent = '';
+          resultEl.className = data.status === 'ACCEPTED' ? 'ok' : 'err';
+          resultEl.textContent = data.message_to_staff || 'No response message received.';
+        } catch (err) {
+          statusEl.textContent = '';
+          resultEl.className = 'err';
+          resultEl.textContent = 'Could not reach the server. Check your connection and try again.';
+          resultEl.style.display = 'block';
+        }
+        btn.disabled = false;
+      },
+      (geoErr) => {
+        statusEl.textContent = '';
+        resultEl.className = 'err';
+        let msg = 'Could not get your location.';
+        if (geoErr.code === geoErr.PERMISSION_DENIED) {
+          msg = 'Location permission denied. Please allow location access and try again.';
+        }
+        resultEl.textContent = msg;
+        resultEl.style.display = 'block';
+        btn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+</script>
+</body>
+</html>
