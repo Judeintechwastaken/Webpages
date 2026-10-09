@@ -104,6 +104,7 @@
           statusEl.textContent = '';
           resultEl.className = data.status === 'ACCEPTED' ? 'ok' : 'err';
           resultEl.textContent = data.message_to_staff || 'No response message received.';
+          resultEl.style.display = 'block';
         } catch (err) {
           statusEl.textContent = '';
           resultEl.className = 'err';
